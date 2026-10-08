@@ -1,206 +1,201 @@
-# Semesteria Hiring Dashboard Backend
+# Semesteria Hiring Dashboard API
 
-## 1. Project overview
-This project implements a small hiring dashboard backend in Django REST Framework for a demo internship assessment. It supports candidate and recruiter roles, job browsing, job applications, stage updates, history logs, and role-based authorization enforced on the backend.
+A Django REST Framework backend for an internship hiring dashboard assignment. The API supports candidate and recruiter accounts, job listings, job applications, role-based access, application-stage changes, optimistic concurrency checks, and application history.
 
-## 2. Technology stack
-- Python
-- Django
-- Django REST Framework
-- PostgreSQL-ready configuration
-- JWT authentication via djangorestframework-simplejwt
-- SQLite fallback for local test execution
-- pytest/Django test runner for automated validation
+## Technology
 
-## 3. Backend architecture
-The backend is organized into the following apps:
-- accounts: custom user model and JWT login logic
-- jobs: job records and listing API
-- applications: application workflow, stage transitions, and application history
-- seed: safe demo-data seeding command
+- Python 3.13 or newer
+- Django and Django REST Framework
+- PostgreSQL on Neon for the shared application database
+- PostgreSQL as the only supported database backend
+- JWT authentication with Simple JWT
+- Django Jazzmin for the admin interface
+- drf-yasg for Swagger and ReDoc API documentation
+- `uv` for Python dependencies and commands
 
-Business logic is centralized in `applications/services.py` so the views remain thin and enforce request handling instead of business rules.
+## Requirements
 
-## 4. Setup instructions
-1. Create a virtual environment.
-2. Install dependencies.
-3. Create a `.env` file from `.env.example`.
-4. Run migrations.
-5. Seed demo data.
-6. Start the Django development server.
+- Windows, macOS, or Linux
+- Python 3.13+
+- `uv`
+- A Neon PostgreSQL database for the recommended setup
 
-On Windows PowerShell:
+The project root is the folder containing `pyproject.toml` and `manage.py`. The commands below use Windows PowerShell from that folder.
+
+## Set up the project
+
+Install and lock the project dependencies:
+
+```powershell
+uv sync --group dev
+```
+
+Create your local environment file:
+
 ```powershell
 Copy-Item .env.example .env
-.\.venv\Scripts\python.exe manage.py migrate
-.\.venv\Scripts\python.exe manage.py seed_data
-.\.venv\Scripts\python.exe manage.py createsuperuser
-.\.venv\Scripts\python.exe manage.py runserver
 ```
 
-After starting the server, open `http://127.0.0.1:8000/admin/` and sign in with the superuser created above. The admin includes users, jobs, applications, and application history. History entries are view-only audit records.
+Edit `.env` before running Django:
 
-## 5. Environment variables
-See `.env.example` for defaults. The checked-in example selects SQLite so a fresh local copy works without a database server. To use Neon:
-1. Create a Neon project and database.
-2. In Neon, copy the **pooled** connection string and keep it private.
-3. Put that string in `DATABASE_URL` in your local `.env`; set `USE_SQLITE_FOR_TESTS=0`.
-4. Run `.\.venv\Scripts\python.exe manage.py migrate` to create the schema in Neon.
-5. Optionally seed demo records with `.\.venv\Scripts\python.exe manage.py seed_data`.
+1. Set `DATABASE_URL` to the pooled connection URL copied from your Neon project. Keep this URL private.
+2. Replace `DJANGO_SECRET_KEY` with a private random value. You can generate one with:
 
-The backend reads standard `postgresql://` or `postgres://` URLs and requires SSL by default. A `sslmode` query parameter already present in the Neon URL is preserved. Do not commit `.env` or expose `DATABASE_URL` in browser code. The legacy `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, and `POSTGRES_PORT` settings remain supported.
+   ```powershell
+   uv run python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
+   ```
 
-## 6. Database setup
-The project uses Django ORM with PostgreSQL support. The `db.sqlite3` file is not needed when `USE_SQLITE_FOR_TESTS=0`; Django connects to the Neon database in `DATABASE_URL` instead. Leave the flag at `1` only when you intentionally want a local SQLite database.
+3. Keep `DJANGO_DEBUG=True` only for local development.
+4. Set `ALLOWED_HOSTS` to the host names serving Django. For local development, `localhost,127.0.0.1` is sufficient.
+5. Set `CORS_ALLOWED_ORIGINS` to the exact origin of your Next.js app, such as `http://localhost:3000`.
 
-## 7. Connecting a Next.js frontend
-This repository contains the Django API, not a Next.js frontend. Keep Neon credentials in Django's `.env`; Next.js should call the Django API over HTTP rather than connect directly to the database.
+PostgreSQL is the only database configured by this project. The settings parse a `postgresql://` or `postgres://` URL and require SSL by default. Do not commit `.env`, paste the database URL into Swagger, or put it in a `NEXT_PUBLIC_` frontend variable.
 
-For local development, Django runs at `http://127.0.0.1:8000` and API endpoints are under `/api/`. For example, Next.js can request the jobs list from `http://127.0.0.1:8000/api/jobs/`. Set `CORS_ALLOWED_ORIGINS` in the Django `.env` to the exact frontend origin (for local Next.js, `http://localhost:3000`; for deployment, your HTTPS frontend origin). Authenticated endpoints require a JWT in the `Authorization: Bearer <token>` header.
+## Set up Neon and start Django
 
-In the Next.js project, store the API base URL (not the database URL) in `.env.local`, for example `NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api`, then call `${process.env.NEXT_PUBLIC_API_BASE_URL}/jobs/` from the frontend. Never use a `NEXT_PUBLIC_` variable for secrets.
+Run database migrations, seed the demo records, create an admin login, then start Django:
 
-### Admin and Swagger testing
-Open `http://127.0.0.1:8000/swagger/` to browse and try API operations. POST/PATCH operations show their input fields:
-- `POST /api/auth/login/`: `username`, `password`
-- `POST /api/applications/`: `job_id` (apply as a candidate to an open job)
-- `PATCH /api/applications/<id>/stage/`: `stage`, `version`
-
-First use the login operation with a seeded account or a user created in admin. Copy its `access` token, click Swagger's **Authorize** button, and enter `Bearer <access-token>`. Then try the protected endpoints. Create and edit jobs in Django admin; the jobs API currently exposes listing only.
-
-## 8. Migration commands
-```bash
-python manage.py makemigrations
-python manage.py migrate
+```powershell
+uv run python manage.py check
+uv run python manage.py migrate
+uv run python manage.py seed_data
+uv run python manage.py createsuperuser
+uv run python manage.py runserver
 ```
 
-## 9. Seed command
-```bash
-python manage.py seed_data
+`migrate` creates the tables in the database selected by `.env`. `seed_data` can be run again safely to add any missing demo records. `createsuperuser` prompts you to create a separate account for Django admin; seeded candidates and recruiters are not admin accounts.
+
+## Admin and demo data
+
+Open [http://127.0.0.1:8000/admin/](http://127.0.0.1:8000/admin/) and sign in using the superuser credentials created above. The admin lists:
+
+- Users
+- Jobs
+- Applications
+- Application history (read-only audit entries)
+
+The seed command creates four demo accounts, seven open IT positions, one closed job, and six sample applications spanning all application stages. It also creates history records for stage changes. The records are synthetic assignment data.
+
+Seeded API demo logins:
+
+| Role | Username | Password |
+| --- | --- | --- |
+| Candidate | `candidate1` | `Candidate@123` |
+| Candidate | `candidate2` | `Candidate@456` |
+| Recruiter | `recruiter1` | `Recruiter@123` |
+| Recruiter | `recruiter2` | `Recruiter@456` |
+
+These are demo-only credentials. The seed command resets these four demo passwords when it runs; do not use seeded credentials for a production system.
+
+## Swagger and ReDoc
+
+With Django running, open:
+
+- Swagger UI: [http://127.0.0.1:8000/swagger/](http://127.0.0.1:8000/swagger/)
+- ReDoc: [http://127.0.0.1:8000/redoc/](http://127.0.0.1:8000/redoc/)
+
+To try protected operations in Swagger:
+
+1. Call `POST /api/auth/login/` with a demo username and password.
+2. Copy the returned `access` token.
+3. Select **Authorize** and enter `Bearer <access-token>`.
+4. Try the candidate or recruiter endpoints using the matching role's demo login.
+
+Swagger request fields include:
+
+- Login: `username`, `password`
+- Apply to a job: `job_id`
+- Change an application stage: `stage`, `version`
+
+## API endpoints
+
+All API endpoints are prefixed with `/api/`.
+
+| Method | Endpoint | Access | Purpose |
+| --- | --- | --- | --- |
+| `POST` | `/api/auth/login/` | Public | Obtain access and refresh JWT tokens |
+| `GET` | `/api/jobs/` | Candidate or recruiter | List open jobs for candidates; recruiters see all jobs |
+| `POST` | `/api/applications/` | Candidate | Apply to an open job using `job_id` |
+| `GET` | `/api/applications/my/` | Candidate | List the logged-in candidate's applications |
+| `GET` | `/api/applications/<id>/` | Application owner or assigned recruiter | View application details |
+| `POST` | `/api/applications/<id>/withdraw/` | Candidate who owns the application | Withdraw an eligible application |
+| `GET` | `/api/recruiter/applications/` | Recruiter | List applications for the recruiter's jobs |
+| `PATCH` | `/api/applications/<id>/stage/` | Recruiter assigned to the job | Move an application to a valid next stage |
+| `GET` | `/api/applications/<id>/history/` | Application owner or assigned recruiter | View application stage history |
+
+The recruiter application list accepts optional `job_id` and `stage` query parameters. Job creation and editing are available in Django admin; the API currently exposes job listing only.
+
+Example request bodies:
+
+```json
+{
+  "username": "candidate1",
+  "password": "Candidate@123"
+}
 ```
-The seed command can be run repeatedly; it creates demo users, seven open IT positions, a closed example job, and sample applications and history records.
 
-## 10. Demo credentials
-Use these demo accounts for local testing:
-- candidate1 / Candidate@123
-- recruiter1 / Recruiter@123
-- recruiter2 / Recruiter@456
+```json
+{
+  "job_id": 1
+}
+```
 
-## 11. API endpoint list
-### Authentication
-- POST /api/auth/login/
+```json
+{
+  "stage": "SHORTLISTED",
+  "version": 1
+}
+```
 
-### Jobs
-- GET /api/jobs/
+Send the access token on protected requests:
 
-### Candidate endpoints
-- GET /api/applications/my/
-- POST /api/applications/
-- GET /api/applications/<id>/
-- POST /api/applications/<id>/withdraw/
-
-### Recruiter endpoints
-- GET /api/recruiter/applications/
-- PATCH /api/applications/<id>/stage/
-- GET /api/applications/<id>/history/
-
-## 12. Authentication
-JWT bearer tokens are used. After login, attach the token in the `Authorization` header:
 ```http
-Authorization: Bearer <access_token>
+Authorization: Bearer <access-token>
 ```
 
-## 13. Candidate workflow
-Candidates can:
-- log in
-- view open jobs
-- apply to open jobs
-- view only their own applications
-- withdraw eligible applications
+The `version` in a stage update must match the current application version. A stale version returns HTTP `409 Conflict`; refresh the application and retry with its latest version.
 
-## 14. Recruiter workflow
-Recruiters can:
-- log in
-- view jobs assigned to them
-- view applications for assigned jobs
-- filter applications by job and stage
-- view application details
-- update application stages
-- inspect application history
+## Assignment business rules
 
-## 15. Stage transition rules
-The system enforces a strict progression model:
-- APPLIED -> SHORTLISTED -> INTERVIEWED -> HIRED
-- APPLIED, SHORTLISTED, and INTERVIEWED can also transition to REJECTED
-- APPLIED, SHORTLISTED, and INTERVIEWED can transition to WITHDRAWN
-- HIRED, REJECTED, and WITHDRAWN are terminal
-- no skipped stages are allowed
+- Users have either the candidate or recruiter role.
+- Candidates see open jobs, apply to open jobs, and access only their own applications.
+- Duplicate applications for the same candidate and job are prevented.
+- Recruiters see applications only for jobs assigned to them.
+- Valid stage progression is `APPLIED → SHORTLISTED → INTERVIEWED → HIRED`.
+- Applications may move from `APPLIED`, `SHORTLISTED`, or `INTERVIEWED` to `REJECTED` or `WITHDRAWN`.
+- `HIRED`, `REJECTED`, and `WITHDRAWN` are terminal stages.
+- Candidates can withdraw their own applications while they are `APPLIED`, `SHORTLISTED`, or `INTERVIEWED`.
+- Successful stage changes and withdrawals are recorded in application history.
 
-## 16. Withdrawal policy
-Candidates may withdraw an application only when it is in APPLIED, SHORTLISTED, or INTERVIEWED. A successful withdrawal records a history event and marks the application as WITHDRAWN.
+## Run tests
 
-## 17. Authorization rules
-- Candidate users can only access their own applications.
-- Recruiters can only access applications tied to jobs assigned to them.
-- Duplicate application creation is blocked at both the business layer and the database constraint layer.
-- Stage updates require a matching version value.
-
-## 18. Concurrency handling
-The application includes a `version` field and stage changes are protected by optimistic concurrency control. If the application was changed by another user, the endpoint responds with HTTP 409 and forces the client to refresh.
-
-## 19. History/audit design
-Every successful stage update or withdrawal writes an `ApplicationHistory` record containing:
-- application id
-- actor
-- timestamp
-- previous_stage
-- new_stage
-
-The history creation is performed in the same database transaction as the stage update to preserve consistency.
-
-## 20. Automated tests
-The project contains automated API tests covering:
-- candidate application flow
-- closed-job rejection
-- duplicate prevention
-- applicant access restrictions
-- recruiter access restrictions
-- stage transition validation
-- history creation
-- stale-version concurrency checks
-
-## 21. Test results
-The final validation result for the assessment API test suite is:
-```bash
-python manage.py test applications.tests --verbosity 1
+```powershell
+uv run python manage.py test accounts applications jobs seed --verbosity 1
 ```
-Result: all tests passed.
 
-## 22. Manual verification performed
-Manual checks were performed for:
-- JWT login flow
-- application creation and duplicate rejection
-- recruiter-only stage updates
-- history and stale version behavior
+Tests use PostgreSQL and Django creates a temporary test database. Use a dedicated, non-production PostgreSQL database or Neon branch for tests; do not run tests against a database containing data you need to keep. The database role must have permission to create and drop the temporary test database.
 
-## 23. Known limitations
-- This project is intentionally a local assessment backend with synthetic data only.
-- It does not implement user registration, password reset, admin dashboards, or external integrations.
+## Next.js integration
 
-## 24. Unfinished work, if any
-No unfinished work is required for the assessment scope.
+This repository contains the Django backend, not the Next.js frontend. Keep the Neon connection string in Django's `.env`; Next.js should make HTTP requests to Django rather than connect directly to Neon.
 
-## 25. Time breakdown
-- Project scaffold and config: 20%
-- Models and permissions: 25%
-- Services and business rules: 25%
-- Tests and validation: 20%
-- Documentation: 10%
+For local Next.js development:
 
-## 26. Next steps
-- Add production-grade deployment settings
-- Move from SQLite to PostgreSQL in staging/production
-- Add CI pipeline and linting
+1. Set `CORS_ALLOWED_ORIGINS=http://localhost:3000` in the Django `.env`.
+2. In the Next.js project, set `NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000/api` in `.env.local`.
+3. Call the API using that base URL. Send `Authorization: Bearer <access-token>` for protected endpoints.
 
-## 27. Brief AI-use note
-This project was scaffolded and iterated with AI-assisted coding in the VS Code environment, then validated with Django's test runner.
+For deployment, set the CORS origin to the exact deployed frontend origin and configure the API URL through the frontend's deployment environment. Never expose database credentials to the browser.
+
+## Project structure
+
+```text
+accounts/       Custom user model, roles, JWT login, and permissions
+applications/  Application models, workflow, history, and business services
+config/         Django settings and top-level URLs
+jobs/           Job model and job listing endpoint
+seed/           Repeatable demo-data management command
+manage.py       Django management entry point
+pyproject.toml  Project metadata and dependencies managed by uv
+uv.lock         Locked dependency versions
+```

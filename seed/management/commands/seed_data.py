@@ -137,6 +137,7 @@ class Command(BaseCommand):
                     },
                 )
 
+            frontend_job = Job.objects.get(title='Frontend Developer')
             app_applied, _ = Application.objects.get_or_create(
                 candidate=candidate1,
                 job=job_b,
@@ -201,4 +202,27 @@ class Command(BaseCommand):
                     new_stage=Application.STAGE_WITHDRAWN,
                 )
 
-            self.stdout.write(self.style.SUCCESS('Seed data created successfully.'))
+            app_hired, _ = Application.objects.get_or_create(
+                candidate=candidate2,
+                job=frontend_job,
+                defaults={'stage': Application.STAGE_HIRED, 'version': 4},
+            )
+            if app_hired.history.count() == 0:
+                for previous_stage, new_stage in (
+                    (Application.STAGE_APPLIED, Application.STAGE_SHORTLISTED),
+                    (Application.STAGE_SHORTLISTED, Application.STAGE_INTERVIEWED),
+                    (Application.STAGE_INTERVIEWED, Application.STAGE_HIRED),
+                ):
+                    ApplicationHistory.objects.create(
+                        application=app_hired,
+                        actor=recruiter1,
+                        previous_stage=previous_stage,
+                        new_stage=new_stage,
+                    )
+
+            self.stdout.write(
+                self.style.SUCCESS(
+                    'Seed data ready: 4 demo users, 7 open IT positions, '
+                    '1 closed example job, and 6 sample applications with stage history.'
+                )
+            )

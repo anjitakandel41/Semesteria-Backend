@@ -71,9 +71,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# SQLite remains the default for local tests. Set USE_SQLITE_FOR_TESTS=0 to use PostgreSQL.
-USE_SQLITE_FOR_TESTS = os.getenv('USE_SQLITE_FOR_TESTS', '1') == '1'
-
 
 def get_postgres_config():
     database_url = os.getenv("DATABASE_URL")
@@ -113,15 +110,7 @@ def get_postgres_config():
     }
 
 
-if USE_SQLITE_FOR_TESTS:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
-else:
-    DATABASES = {'default': get_postgres_config()}
+DATABASES = {'default': get_postgres_config()}
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},

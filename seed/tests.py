@@ -1,6 +1,7 @@
 from django.core.management import call_command
 from django.test import TestCase
 
+from applications.models import Application
 from jobs.models import Job
 
 
@@ -29,3 +30,16 @@ class SeedDataTests(TestCase):
         )
         self.assertEqual(seeded_open_jobs.count(), len(expected_titles))
         self.assertTrue(Job.objects.filter(title='Closed Job C', status=Job.STATUS_CLOSED).exists())
+
+        applications = list(Application.objects.select_related('job').all())
+        self.assertSetEqual(
+            {application.stage for application in applications},
+            {
+                'APPLIED',
+                'SHORTLISTED',
+                'INTERVIEWED',
+                'HIRED',
+                'REJECTED',
+                'WITHDRAWN',
+            },
+        )
